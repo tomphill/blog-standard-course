@@ -14,6 +14,8 @@
     "@fortawesome/free-solid-svg-icons": "^6.2.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@next/font": "^13.1.6",
+    "@webdeveducation/next-verify-stripe": "^1.0.1",
+    "micro-cors": "^0.1.1",
     "mongodb": "^4.13.0",
     "next": "13.1.6",
     "numeral": "^2.0.6",
