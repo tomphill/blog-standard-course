@@ -43,13 +43,33 @@ export default withApiAuthRequired(async function handler(req, res) {
     prompt: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}.
     The content should be formatted in SEO-friendly HTML.
     The response must also include appropriate HTML title and meta description content.
-    The return format must be stringified JSON in the following format:
+    The return format must be valid JSON (with no \n or \t in the output) in the following format:
     {
       "postContent": post content here
       "title": title goes here
       "metaDescription": meta description goes here
     }`,
   });
+
+  // if you're still getting an issue parsing the JSON with \n characters,
+  // then try specifying the returned JSON in 1 line rather than over multiple lines, like so:
+  // {"postContent": post content here, "title": title goes here, "metaDescription": meta description goes here}`,
+
+  let parsedJSON;
+
+  try {
+    parsedJSON = JSON.parse(
+      response.data.choices[0]?.text.split('\n').join('')
+    );
+  } catch (e) {
+    res.status(500).json({
+      message: 'The response could not be parsed into JSON',
+      data: response.data.choices[0]?.text,
+    });
+    return;
+  }
+
+  //res.status(200).json({post: parsedJSON})
 
   // SNIPPET FOR GPT 3.5
   /*const response = await openai.createChatCompletion({
@@ -64,19 +84,15 @@ export default withApiAuthRequired(async function handler(req, res) {
         content: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}.
         The content should be formatted in SEO-friendly HTML.
         The response must also include appropriate HTML title and meta description content.
-        The return format must be stringified JSON in the following format:
-        {
-          "postContent": post content here
-          "title": title goes here
-          "metaDescription": meta description goes here
-        }`,
+        The return format must be valid JSON (with no \n or \t) in the following format:
+        {"postContent": post content here, "title": title goes here, "metaDescription": meta description goes here}`,
       },
     ],
     max_tokens: 3600,
     temperature: 0,
-  });*/
+  });
 
-  console.log('response: ', response);
+  console.log('response: ', response.data.choices[0]);*/
 
   await db.collection('users').updateOne(
     {
@@ -89,9 +105,9 @@ export default withApiAuthRequired(async function handler(req, res) {
     }
   );
 
-  const parsed = JSON.parse(
+  /*const parsed = JSON.parse(
     response.data.choices[0]?.text.split('\n').join('')
-  );
+  );*/
 
   // SNIPPET FOR GPT 3.5
   /*const parsed = JSON.parse(
