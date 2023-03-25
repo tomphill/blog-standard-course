@@ -55,20 +55,6 @@ export default withApiAuthRequired(async function handler(req, res) {
   // then try specifying the returned JSON in 1 line rather than over multiple lines, like so:
   // {"postContent": post content here, "title": title goes here, "metaDescription": meta description goes here}`,
 
-  let parsedJSON;
-
-  try {
-    parsedJSON = JSON.parse(
-      response.data.choices[0]?.text.split('\n').join('')
-    );
-  } catch (e) {
-    res.status(500).json({
-      message: 'The response could not be parsed into JSON',
-      data: response.data.choices[0]?.text,
-    });
-    return;
-  }
-
   //res.status(200).json({post: parsedJSON})
 
   // SNIPPET FOR GPT 3.5
@@ -94,6 +80,22 @@ export default withApiAuthRequired(async function handler(req, res) {
 
   console.log('response: ', response.data.choices[0]);*/
 
+  let parsed;
+
+  try {
+    // SNIPPET FOR GPT 3.5
+    /*parsed = JSON.parse(
+      response.data.choices[0]?.message.content.split('\n').join('')
+    );*/
+    parsed = JSON.parse(response.data.choices[0]?.text.split('\n').join(''));
+  } catch (e) {
+    res.status(500).json({
+      message: 'The response could not be parsed into JSON',
+      data: response.data.choices[0]?.text,
+    });
+    return;
+  }
+
   await db.collection('users').updateOne(
     {
       auth0Id: user.sub,
@@ -104,15 +106,6 @@ export default withApiAuthRequired(async function handler(req, res) {
       },
     }
   );
-
-  /*const parsed = JSON.parse(
-    response.data.choices[0]?.text.split('\n').join('')
-  );*/
-
-  // SNIPPET FOR GPT 3.5
-  /*const parsed = JSON.parse(
-    response.data.choices[0]?.message.content.split('\n').join('')
-  );*/
 
   const post = await db.collection('posts').insertOne({
     postContent: parsed?.postContent,
