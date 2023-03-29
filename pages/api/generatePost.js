@@ -32,33 +32,22 @@ export default withApiAuthRequired(async function handler(req, res) {
     return;
   }
 
-  /*const topic = 'Top 10 tips for dog owners';
-  const keywords =
-    'first-time dog owners, common dog health issues, best dog breeds';*/
-
-  const response = await openai.createCompletion({
+  /*const response = await openai.createCompletion({
     model: 'text-davinci-003',
     temperature: 0,
     max_tokens: 3600,
     prompt: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}.
     The content should be formatted in SEO-friendly HTML.
     The response must also include appropriate HTML title and meta description content.
-    The return format must be valid JSON (with no \n or \t in the output) in the following format:
+    The return format must be stringified JSON in the following format:
     {
       "postContent": post content here
       "title": title goes here
       "metaDescription": meta description goes here
     }`,
-  });
+  });*/
 
-  // if you're still getting an issue parsing the JSON with \n characters,
-  // then try specifying the returned JSON in 1 line rather than over multiple lines, like so:
-  // {"postContent": post content here, "title": title goes here, "metaDescription": meta description goes here}`,
-
-  //res.status(200).json({post: parsedJSON})
-
-  // SNIPPET FOR GPT 3.5
-  /*const response = await openai.createChatCompletion({
+  const postContentResult = await openai.createChatCompletion({
     model: 'gpt-3.5-turbo',
     messages: [
       {
@@ -67,57 +56,95 @@ export default withApiAuthRequired(async function handler(req, res) {
       },
       {
         role: 'user',
-        content: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}.
-        The content should be formatted in SEO-friendly HTML.
-        The response must also include appropriate HTML title and meta description content.
-        The return format must be valid JSON (with no \n or \t) in the following format:
-        {"postContent": post content here, "title": title goes here, "metaDescription": meta description goes here}`,
+        content: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}. 
+      The response should be formatted in SEO-friendly HTML, 
+      limited to the following HTML tags: p, h1, h2, h3, h4, h5, h6, strong, i, ul, li, ol.`,
       },
     ],
-    max_tokens: 3600,
     temperature: 0,
   });
 
-  console.log('response: ', response.data.choices[0]);*/
+  const postContent = postContentResult.data.choices[0]?.message.content;
 
-  let parsed;
-
-  try {
-    // SNIPPET FOR GPT 3.5
-    /*parsed = JSON.parse(
-      response.data.choices[0]?.message.content.split('\n').join('')
-    );*/
-    parsed = JSON.parse(response.data.choices[0]?.text.split('\n').join(''));
-  } catch (e) {
-    res.status(500).json({
-      message: 'The response could not be parsed into JSON',
-      data: response.data.choices[0]?.text,
-    });
-    return;
-  }
-
-  await db.collection('users').updateOne(
-    {
-      auth0Id: user.sub,
-    },
-    {
-      $inc: {
-        availableTokens: -1,
+  const titleResult = await openai.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a blog post generator.',
       },
-    }
-  );
+      {
+        role: 'user',
+        content: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}. 
+      The response should be formatted in SEO-friendly HTML, 
+      limited to the following HTML tags: p, h1, h2, h3, h4, h5, h6, strong, i, ul, li, ol.`,
+      },
+      {
+        role: 'assistant',
+        content: postContent,
+      },
+      {
+        role: 'user',
+        content: 'Generate appropriate title tag text for the above blog post',
+      },
+    ],
+    temperature: 0,
+  });
+
+  const metaDescriptionResult = await openai.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a blog post generator.',
+      },
+      {
+        role: 'user',
+        content: `Write a long and detailed SEO-friendly blog post about ${topic}, that targets the following comma-separated keywords: ${keywords}. 
+      The response should be formatted in SEO-friendly HTML, 
+      limited to the following HTML tags: p, h1, h2, h3, h4, h5, h6, strong, i, ul, li, ol.`,
+      },
+      {
+        role: 'assistant',
+        content: postContent,
+      },
+      {
+        role: 'user',
+        content:
+          'Generate SEO-friendly meta description content for the above blog post',
+      },
+    ],
+    temperature: 0,
+  });
+
+  const title = titleResult.data.choices[0]?.message.content;
+  const metaDescription =
+    metaDescriptionResult.data.choices[0]?.message.content;
+
+  console.log('POST CONTENT: ', postContent);
+  console.log('TITLE: ', title);
+  console.log('META DESCRIPTION: ', metaDescription);
+
+  /*await db.collection('users').updateOne(
+  {
+    auth0Id: user.sub,
+  },
+  {
+    $inc: {
+      availableTokens: -1,
+    },
+  }
+);*/
 
   const post = await db.collection('posts').insertOne({
-    postContent: parsed?.postContent,
-    title: parsed?.title,
-    metaDescription: parsed?.metaDescription,
+    postContent: postContent || '',
+    title: title || '',
+    metaDescription: metaDescription || '',
     topic,
     keywords,
     userId: userProfile._id,
     created: new Date(),
   });
-
-  console.log('POST: ', post);
 
   res.status(200).json({
     postId: post.insertedId,
